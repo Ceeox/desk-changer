@@ -24,7 +24,6 @@ const Me = imports.misc.extensionUtils.getCurrentExtension();
 const Config = imports.misc.config;
 const Gettext = imports.gettext.domain('desk-changer');
 const Gio = imports.gi.Gio;
-const Lang = imports.lang;
 const Main = imports.ui.main;
 const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
@@ -44,13 +43,10 @@ const Ui = Me.imports.ui;
  *
  * @type {Lang.Class}
  */
-const DeskChangerIndicator = new Lang.Class({
-    Name: 'DeskChangerIndicator',
-    Extends: PanelMenu.Button,
-
-    _init: function () {
+const DeskChangerIndicator = class DeskChangerIndicator extends PanelMenu.Button {
+    constructor() {
+        super(0.0, 'DeskChanger');
         this.settings = new DeskChangerSettings();
-        this.parent(0.0, 'DeskChanger');
         this.daemon = new DeskChangerDaemon(this.settings);
 
         this.actor.add_child(new Ui.DeskChangerIcon(this.daemon, this.settings));
@@ -77,11 +73,11 @@ const DeskChangerIndicator = new Lang.Class({
         this.menu.addMenuItem(new Menu.DeskChangerDaemonControls(this.daemon));
         // Simple settings for the extension
         let settings = new PopupMenu.PopupMenuItem(_('DeskChanger Settings'));
-        settings.connect('activate', function () {
+        settings.connect('activate', () => {
             Util.spawn(['gnome-shell-extension-prefs', Me.metadata.uuid]);
         });
         this.menu.addMenuItem(settings);
-        this.settings.connect('changed::update-lockscreen', Lang.bind(this, function () {
+        this.settings.connect('changed::update-lockscreen', () => {
             if (this.settings.update_lockscreen) {
                 this.menu.addMenuItem(new Menu.DeskChangerProfileLockscreen(this.settings), 1);
             } else {
@@ -91,22 +87,20 @@ const DeskChangerIndicator = new Lang.Class({
                     item instanceof Menu.DeskChangerProfileLockscreen && item.destroy();
                 });
             }
-        }));
-    },
+        });
+    }
 
-    destroy: function () {
-        this.parent();
+    destroy() {
         this.settings.destroy();
         this.daemon.destroy();
+        if (this.child != null)
+            this.child.destroy();
     }
-});
+};
 
-const DeskChangerSystemIndicator = new Lang.Class({
-    Name: 'DeskChangerSystemIndicator',
-    Extends: PanelMenu.SystemIndicator,
-
-    _init: function (menu) {
-        this.parent();
+const DeskChangerSystemIndicator = class DeskChangerSystemIndicator extends PanelMenu.SystemIndicator {
+    constructor(menu) {
+        super();
         this.daemon = new DeskChangerDaemon();
 
         this.settings = new DeskChangerSettings();
@@ -120,18 +114,18 @@ const DeskChangerSystemIndicator = new Lang.Class({
         this._menu.menu.addMenuItem(new Menu.DeskChangerDaemonControls(this.daemon));
         // Simple settings for the extension
         let settings = new PopupMenu.PopupMenuItem(_('DeskChanger Settings'));
-        settings.connect('activate', function () {
+        settings.connect('activate', () => {
             Util.spawn(['gnome-shell-extension-prefs', Me.metadata.uuid]);
         });
         this._menu.menu.addMenuItem(settings);
         let position = (parseInt(Config.PACKAGE_VERSION.split(".")[1]) < 18) ? this._menu.menu.numMenuItems - 2 : this._menu.menu.numMenuItems - 1;
         menu.addMenuItem(this._menu, position);
         this._indicator = null;
-        this.settings.connect('changed::icon-preview', Lang.bind(this, this._update_indicator));
+        this.settings.connect('changed::icon-preview', () => this._update_indicator());
         this._update_indicator();
-    },
+    }
 
-    destroy: function () {
+    destroy() {
         if (this._indicator) {
             this._indicator.destroy();
         }
@@ -139,9 +133,9 @@ const DeskChangerSystemIndicator = new Lang.Class({
         this._menu.destroy();
         this.settings.destroy();
         this.daemon.destroy();
-    },
+    }
 
-    _update_indicator: function () {
+    _update_indicator() {
         if (this._indicator !== null) {
             this.indicators.remove_actor(this._indicator);
             this._indicator.destroy();
@@ -151,11 +145,11 @@ const DeskChangerSystemIndicator = new Lang.Class({
         if (this.settings.icon_preview) {
             this._indicator = new Ui.DeskChangerIcon(this.daemon, this.settings);
             this.indicators.add_actor(this._indicator);
-            this._indicator.connect('notify::visible', Lang.bind(this, this._syncIndicatorsVisible));
+            this._indicator.connect('notify::visible', () => this._syncIndicatorsVisible());
             this._syncIndicatorsVisible();
         }
     }
-});
+};
 
 let daemon, indicator, settings, shellSettings;
 let changed_id, current_profile_id, error_id, notifications_id, random_id, rotation_id;
@@ -208,25 +202,25 @@ function disable() {
 function enable() {
     debug('enabling extension');
 
-    current_profile_id = settings.connect('changed::current-profile', function () {
+    current_profile_id = settings.connect('changed::current-profile', () => {
         if (settings.notifications)
             Main.notify('Desk Changer', _('Profile changed to %s'.format(settings.current_profile)));
     });
 
-    notifications_id = settings.connect('changed::notifications', function () {
+    notifications_id = settings.connect('changed::notifications', () => {
         Main.notify('Desk Changer', ((settings.notifications) ? _('Notifications are now enabled') : _('Notifications are now disabled')));
     });
 
-    changed_id = daemon.connectSignal('changed', function (emitter, signalName, parameters) {
+    changed_id = daemon.connectSignal('changed', (emitter, signalName, parameters) => {
         if (settings.notifications)
             Main.notify('Desk Changer', _('Wallpaper Changed: %s'.format(parameters[0])));
     });
 
-    error_id = daemon.connectSignal('error', function (emitter, signalName, parameters) {
+    error_id = daemon.connectSignal('error', (emitter, signalName, parameters) => {
         Main.notifyError('Desk Changer', _('Daemon Error: %s'.format(parameters[0])));
     });
 
-    random_id = settings.connect('changed::random', function () {
+    random_id = settings.connect('changed::random', () => {
         if (settings.notifications) {
             let message;
 
@@ -240,7 +234,7 @@ function enable() {
         }
     });
 
-    rotation_id = settings.connect('changed::rotation', function () {
+    rotation_id = settings.connect('changed::rotation', () => {
         if (settings.notifications) {
             let message;
             switch (settings.rotation) {
@@ -280,23 +274,23 @@ function init() {
     Convenience.initTranslations();
     debug('initalizing extension version: %s'.format(DeskChangerVersion));
     settings = new DeskChangerSettings();
-    shellSettings = new Gio.Settings({'schema': 'org.gnome.shell'});
+    shellSettings = new Gio.Settings({ 'schema': 'org.gnome.shell' });
     daemon = new DeskChangerDaemon(settings);
     if (Main.screenShield !== null) {
         daemon.lockscreen = Main.screenShield.locked;
-        Main.screenShield.connect('locked-changed', function () {
+        Main.screenShield.connect('locked-changed', () => {
             // lockscreen mode toggle through signals
             daemon.lockscreen = Main.screenShield.locked;
         });
     }
 
-    Gio.DBus.session.connect('closed', function () {
+    Gio.DBus.session.connect('closed', () => {
         if (daemon.is_running) {
             daemon.toggle();
         }
     });
 
-    settings.connect('changed::integrate-system-menu', function () {
+    settings.connect('changed::integrate-system-menu', () => {
         if (indicator !== null) {
             disable();
             enable();

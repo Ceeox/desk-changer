@@ -27,63 +27,59 @@ const Gettext = imports.gettext.domain(Me.metadata.uuid);
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 const GdkPixbuf = imports.gi.GdkPixbuf;
-const Lang = imports.lang;
 const St = imports.gi.St;
+const GObject = imports.gi.GObject;
 const _ = Gettext.gettext;
 
 const debug = Me.imports.utils.debug;
 const error = Me.imports.utils.error;
 
-var DeskChangerButton = new Lang.Class({
-    Name: 'DeskChangerButton',
-    Extends: St.Button,
-
-    _init: function (icon, callback) {
-        this.icon = new St.Icon({icon_name: icon + '-symbolic', icon_size: 20});
-        this.parent({
-            child: this.icon,
+var DeskChangerButton = GObject.registerClass(class DeskChangerButton extends St.Button {
+    _init(icon, callback) {
+        let st_icon = new St.Icon({ icon_name: icon + '-symbolic', icon_size: 20 });
+        super._init({
+            child: st_icon,
             style_class: 'system-menu-action'// : 'notification-icon-button control-button'
         });
-        this._handler = this.connect('clicked', callback);
-    },
+        this.icon = st_icon;
+        this._handler = this.connect('clicked', () => callback());
+    }
 
-    destroy: function () {
+    destroy() {
         debug('removing button clicked handler %s'.format(this._handler));
         this.disconnect(this._handler);
         this.icon.destroy();
-        this.parent();
-    },
+        if (this.child != null)
+            this.child.destroy();
+    }
 
-    set_icon: function (icon) {
+    set_icon(icon) {
         this.icon.icon_name = icon + '-symbolic';
     }
 });
 
-var DeskChangerIcon = new Lang.Class({
-    Name: 'DeskChangerIcon',
-    Extends: St.Bin,
-
-    _init: function (daemon, settings) {
+var DeskChangerIcon = GObject.registerClass(class DeskChangerIcon extends St.Bin {
+    _init(daemon, settings) {
+        super._init({ style_class: 'panel-status-menu-box' });
         this._gicon = Gio.icon_new_for_string(Me.path + '/icons/wallpaper-icon.png');
         this.daemon = daemon;
         this._settings = settings;
-        this.parent({style_class: 'panel-status-menu-box'});
         // fallback when the daemon is not running
         this._icon = null;
         // the preview can be shown as the icon instead
         this._preview = null;
         // this will switch between the icon and preview when the setting is changed
-        this._settings.connect('changed::icon-preview', Lang.bind(this, this.update_child));
-        this.daemon.connectSignal('preview', Lang.bind(this, function (proxy, e, properties) {
+        this._settings.connect('changed::icon-preview', () => this.update_child());
+        this.daemon.connectSignal('preview', (proxy, e, properties) => {
             let file = properties[0];
             if (this._icon) {
                 this.update_child(file);
             }
-        }));
+        });
         this.update_child();
-    },
+    }
 
-    destroy: function () {
+    destroy() {
         if (this._icon) {
             this._icon.destroy();
         }
@@ -92,10 +88,11 @@ var DeskChangerIcon = new Lang.Class({
             this._preview.destroy();
         }
 
-        this.parent();
-    },
+        if (this.child != null)
+            this.child.destroy();
+    }
 
-    update_child: function (file) {
+    update_child(file) {
         if (this._settings.icon_preview && this._createPreview(file)) {
             debug('updating icon to preview');
             this.set_child(this._preview);
@@ -105,7 +102,7 @@ var DeskChangerIcon = new Lang.Class({
                 this._icon = null;
             }
         } else if (!(this._icon)) {
-            this._icon = new St.Icon({gicon: this._gicon, style_class: 'system-status-icon'});
+            this._icon = new St.Icon({ gicon: this._gicon, style_class: 'system-status-icon' });
             this.set_child(this._icon);
 
             if (this._preview) {
@@ -113,15 +110,15 @@ var DeskChangerIcon = new Lang.Class({
                 this._preview = null;
             }
         }
-    },
+    }
 
-    _createPreview: function (file) {
+    _createPreview(file) {
         if (this._preview) {
             this._preview.destroy();
             this._preview = null;
         }
 
-        this._preview = new DeskChangerPreview(34, this.daemon, Lang.bind(this, this.update_child));
+        this._preview = new DeskChangerPreview(34, this.daemon, () => this.update_child());
 
         if (!(this._preview.file)) {
             if (typeof file === "string") {
@@ -137,12 +134,9 @@ var DeskChangerIcon = new Lang.Class({
     }
 });
 
-var DeskChangerPreview = new Lang.Class({
-    Name: 'DeskChangerPreview',
-    Extends: St.Bin,
-
-    _init: function (width, daemon, callback) {
-        this.parent({
+var DeskChangerPreview = GObject.registerClass(class DeskChangerPreview extends St.Bin {
+    _init(width, daemon, callback) {
+        super._init({
             x_align: St.Align.MIDDLE
         });
         this._file = null;
@@ -150,34 +144,34 @@ var DeskChangerPreview = new Lang.Class({
         this.daemon = daemon;
         this._texture = null;
         this._width = width;
-        this._next_file_id = this.daemon.connectSignal('preview', Lang.bind(this, function (proxy, signalName, parameters) {
+        this._next_file_id = this.daemon.connectSignal('preview', (proxy, signalName, parameters) => {
             let file = parameters[0];
             this.set_wallpaper(file);
-        }));
-        this._toggled_id = this.daemon.connect('toggled', Lang.bind(this, function () {
+        });
+        this._toggled_id = this.daemon.connect('toggled', () => {
             if (!this.daemon.is_running && this._texture) {
                 debug('clearing preview, daemon stopped');
                 this._texture.destroy();
                 this._texture = null;
             }
-        }));
+        });
 
         if (this.daemon.bus.queue && this.daemon.bus.queue.length > 0) {
             this.set_wallpaper(this.daemon.bus.queue[0], false);
         }
 
         this.set_child(this._texture);
-    },
+    }
 
-    destroy: function () {
+    destroy() {
         this.daemon.disconnectSignal(this._next_file_id);
         if (this._texture) {
             this._texture.destroy();
             this._texture = null;
         }
-    },
+    }
 
-    set_wallpaper: function (file, c) {
+    set_wallpaper(file, c) {
         if (this._texture) {
             this._texture.destroy();
             this._texture = null;
@@ -186,19 +180,19 @@ var DeskChangerPreview = new Lang.Class({
         this._file = file = GLib.uri_unescape_string(file, null);
         file = file.replace('file://', '');
         debug('setting preview to %s'.format(file));
-        try{
+        try {
             let scale_factor = St.ThemeContext.get_for_stage(global.stage).scale_factor;
             let pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(file, this._width * scale_factor, -1, true);
             let height = Math.round(pixbuf.get_height() / (pixbuf.get_width() / this._width));
             let image = new Clutter.Image();
             image.set_data(
                 pixbuf.get_pixels(),
-                (pixbuf.get_has_alpha()? Cogl.PixelFormat.RGBA_8888 : Cogl.PixelFormat.RGB_888),
+                (pixbuf.get_has_alpha() ? Cogl.PixelFormat.RGBA_8888 : Cogl.PixelFormat.RGB_888),
                 this._width * scale_factor,
                 height * scale_factor,
                 pixbuf.get_rowstride()
             );
-            this._texture = new Clutter.Actor({height: height * scale_factor, width: this._width * scale_factor});
+            this._texture = new Clutter.Actor({ height: height * scale_factor, width: this._width * scale_factor });
             this._texture.set_content(image);
             this.add_actor(this._texture);
         } catch (e) {
@@ -215,29 +209,26 @@ var DeskChangerPreview = new Lang.Class({
         if (c === true && typeof this._callback === 'function') {
             this._callback(file);
         }
-    },
+    }
 
     get file() {
         return this._file;
     }
 });
 
-var DeskChangerStateButton = new Lang.Class({
-    Name: 'DeskChangerStateButton',
-    Extends: DeskChangerButton,
-
-    _init: function (states, callback) {
+var DeskChangerStateButton = GObject.registerClass(class DeskChangerStateButton extends DeskChangerButton {
+    _init(states, callback) {
         if (states.length < 2) {
             RangeError('You must provide at least two states for the button');
         }
 
+        super._init(states[0].icon, () => this._clicked());
         this._callback = callback;
         this._states = states;
         this._state = 0;
-        this.parent(this._states[0].icon, Lang.bind(this, this._clicked));
-    },
+    }
 
-    set_state: function (state) {
+    set_state(state) {
         if (state === this._states[this._state].name) {
             // We are already on that state... dafuq?!
             return;
@@ -250,9 +241,9 @@ var DeskChangerStateButton = new Lang.Class({
                 break;
             }
         }
-    },
+    }
 
-    _clicked: function () {
+    _clicked() {
         let state = this._state;
         if (++state >= this._states.length)
             state = 0;

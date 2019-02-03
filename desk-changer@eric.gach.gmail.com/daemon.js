@@ -19,7 +19,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-const Lang = imports.lang;
 const Me = imports.misc.extensionUtils.getCurrentExtension();
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
@@ -69,17 +68,15 @@ const DBusInterface = '<node>\
 </node>';
 const DBusProxy = Gio.DBusProxy.makeProxyWrapper(DBusInterface);
 
-var DeskChangerDaemon = new Lang.Class({
-    Name: 'DeskChangerDaemon',
-
-    _init: function (settings) {
+var DeskChangerDaemon = class DeskChangerDaemon {
+    constructor(settings) {
         this._bus_handlers = [];
         this.settings = settings;
         this._is_running = false;
         this._path = Me.dir.get_path();
         this.bus = new DeskChangerDaemonProxy(Gio.DBus.session, 'org.gnome.Shell.Extensions.DeskChanger.Daemon', '/org/gnome/Shell/Extensions/DeskChanger/Daemon');
         this._bus = new DBusProxy(Gio.DBus.session, 'org.freedesktop.DBus', '/org/freedesktop/DBus');
-        this._owner_changed_id = this._bus.connectSignal('NameOwnerChanged', Lang.bind(this, function (emitter, signalName, params) {
+        this._owner_changed_id = this._bus.connectSignal('NameOwnerChanged', (emitter, signalName, params) => {
             if (params[0] === "org.gnome.Shell.Extensions.DeskChanger.Daemon") {
                 if (params[1] !== "" && params[2] === "") {
                     this._off();
@@ -88,7 +85,7 @@ var DeskChangerDaemon = new Lang.Class({
                     this._on();
                 }
             }
-        }));
+        });
 
         let result = this._bus.ListNamesSync();
         result = String(result).split(',');
@@ -98,24 +95,24 @@ var DeskChangerDaemon = new Lang.Class({
                 break;
             }
         }
-    },
+    }
 
-    connectSignal: function (signal, callback) {
+    connectSignal(signal, callback) {
         let handler_id = this.bus.connectSignal(signal, callback);
         this._bus_handlers.push(handler_id);
         debug('added dbus handler ' + handler_id);
         return handler_id;
-    },
+    }
 
-    destroy: function () {
+    destroy() {
         while (this._bus_handlers.length) {
             this.disconnectSignal(this._bus_handlers[0]);
         }
 
         this._bus.disconnectSignal(this._owner_changed_id);
-    },
+    }
 
-    disconnectSignal: function (handler_id) {
+    disconnectSignal(handler_id) {
         let index = this._bus_handlers.indexOf(handler_id);
 
         debug('removing dbus handler ' + handler_id);
@@ -123,9 +120,9 @@ var DeskChangerDaemon = new Lang.Class({
         if (index > -1) {
             this._bus_handlers.splice(index, 1);
         }
-    },
+    }
 
-    toggle: function () {
+    toggle() {
         if (this._is_running) {
             debug('stopping daeomn');
             this.bus.QuitSync();
@@ -137,28 +134,27 @@ var DeskChangerDaemon = new Lang.Class({
             ]
             GLib.spawn_async(this._path, scriptArgv, null, GLib.SpawnFlags.DO_NOT_REAP_CHILD, null);
         }
-    },
+    }
 
-    _off: function () {
+    _off() {
         this._is_running = false;
         debug('emit(\'toggled\', false)');
         this.emit('toggled', false);
-    },
+    }
 
-    _on: function () {
+    _on() {
         debug('the desk-changer daemon is running');
         this._is_running = true;
         debug('emit(\'toggled\', true)');
         this.emit('toggled', true);
-    },
+    }
 
     get is_running() {
         return this._is_running;
-    },
+    }
 
     set lockscreen(value) {
         this.bus.lockscreen = Boolean(value);
     }
-});
-
+};
 Signals.addSignalMethods(DeskChangerDaemon.prototype);

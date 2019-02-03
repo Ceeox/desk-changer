@@ -1,6 +1,6 @@
 const Me = imports.misc.extensionUtils.getCurrentExtension();
 
-function error(exception, message=null) {
+function error(exception, message = null) {
     let output = null;
 
     if (message) {

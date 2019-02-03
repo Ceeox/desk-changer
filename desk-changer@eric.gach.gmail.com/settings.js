@@ -21,78 +21,77 @@
  */
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
-const Lang = imports.lang;
 const Me = imports.misc.extensionUtils.getCurrentExtension();
 
-var DeskChangerSettings = new Lang.Class({
-    Name: 'DeskChangerSettings',
-
-    _init: function () {
+var DeskChangerSettings = class DeskChangerSettings {
+    constructor() {
         let source = Gio.SettingsSchemaSource.new_from_directory(
             Me.dir.get_child('schemas').get_path(),
             Gio.SettingsSchemaSource.get_default(),
             false
         );
 
-        this.schema = new Gio.Settings({settings_schema: source.lookup('org.gnome.shell.extensions.desk-changer', false)});
+        this.schema = new Gio.Settings({ settings_schema: source.lookup('org.gnome.shell.extensions.desk-changer', false) });
         this._handlers = [];
-    },
+    }
 
-    get allowed_mime_types()
-    {
+    destroy() {
+        while (this._handlers.length) {
+            this.disconnect(this._handlers[0]);
+        }
+    }
+
+    get allowed_mime_types() {
         return this.schema.get_value('allowed-mime-types').deep_unpack();
-    },
+    }
 
-    set allowed_mime_types(value)
-    {
+    set allowed_mime_types(value) {
         this.schema.set_value('allowed-mime-types', new GLib.Variant('as', value));
-    },
+    }
 
     get auto_rotate() {
         return this.schema.get_boolean('auto-rotate');
-    },
+    }
 
     set auto_rotate(value) {
         this.schema.set_boolean('auto-rotate', Boolean(value));
-    },
+    }
 
-    get auto_start()
-    {
+    get auto_start() {
         return this.schema.get_boolean('auto-start');
-    },
+    }
 
-    set auto_start(value)
-    {
+    set auto_start(value) {
         this.schema.set_boolean('auto-start', Boolean(value));
-    },
+    }
 
     get current_profile() {
         return this.schema.get_string('current-profile');
-    },
+    }
 
     set current_profile(value) {
         this.schema.set_string('current-profile', value);
-    },
+    }
 
     get icon_preview() {
         return this.schema.get_boolean('icon-preview');
-    },
+    }
 
     set icon_preview(value) {
         this.schema.set_boolean('icon-preview', Boolean(value));
-    },
+    }
 
     get integrate_system_menu() {
         return this.schema.get_boolean('integrate-system-menu');
-    },
+    }
 
     set integrate_system_menu(value) {
         this.schema.set_boolean('integrate-system-menu', Boolean(value));
-    },
+    }
 
     get interval() {
         return this.schema.get_int('interval');
-    },
+    }
 
     set interval(value) {
         if (parseInt(value) > 1) {
@@ -101,97 +100,88 @@ var DeskChangerSettings = new Lang.Class({
         }
 
         this.schema.set_int('interval', parseInt(value));
-    },
+    }
 
     get lockscreen_profile() {
         return this.schema.get_string('lockscreen-profile');
-    },
+    }
 
     set lockscreen_profile(value) {
         if (value === null || value === this.current_profile) {
-            value="";
+            value = "";
         }
 
         this.schema.set_string('lockscreen-profile', value);
-    },
+    }
 
     get notifications() {
         return this.schema.get_boolean('notifications');
-    },
+    }
 
     set notifications(value) {
         this.schema.set_boolean('notifications', Boolean(value));
-    },
+    }
 
     get profiles() {
         return this.schema.get_value('profiles').deep_unpack();
-    },
+    }
 
     set profiles(value) {
         this.schema.set_value('profiles', new GLib.Variant("a{sa(sb)}", value));
-    },
+    }
 
     get random() {
         return this.schema.get_boolean('random');
-    },
+    }
 
     set random(value) {
         this.schema.set_boolean('random', Boolean(value));
-    },
+    }
 
     get remember_profile_state() {
         return this.schema.get_boolean('remember-profile-state');
-    },
+    }
 
     set remember_profile_state(value) {
         this.schema.set_boolean('remember-profile-state', Boolean(value));
-    },
+    }
 
     get rotation() {
         return this.schema.get_string('rotation');
-    },
+    }
 
     set rotation(value) {
         this.schema.set_string('rotation', value);
-    },
+    }
 
-    get update_lockscreen()
-    {
+    get update_lockscreen() {
         return this.schema.get_boolean('update-lockscreen');
-    },
+    }
 
-    set update_lockscreen(value)
-    {
+    set update_lockscreen(value) {
         this.schema.set_boolean('update-lockscreen', Boolean(value));
-    },
+    }
 
-    connect: function (signal, callback) {
-        let handler_id = this.schema.connect(signal, callback);
+    connect(signal, callback) {
+        let handler_id = this.schema.connect(signal, () => callback());
         this._handlers.push(handler_id);
         return handler_id;
-    },
+    }
 
-    destroy: function () {
-        // Remove the remaining signals...
-        while (this._handlers.length) {
-            this.disconnect(this._handlers[0]);
-        }
-    },
-
-    disconnect: function (handler_id) {
+    disconnect(handler_id) {
         let index = this._handlers.indexOf(handler_id);
         this.schema.disconnect(handler_id);
 
         if (index > -1) {
             this._handlers.splice(index, 1);
         }
-    },
+    }
 
-    getKeybinding: function (name) {
+    getKeybinding(name) {
         return this.schema.get_strv(name);
-    },
+    }
 
-    setKeybinding: function (name, value) {
+    setKeybinding(name, value) {
         this.schema.set_strv(name, value);
     }
-});
+};
